@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 关键修改：添加移动端适配的viewport设置 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>大尺寸图片导航系统 - 移动端适配版</title>
+    <style>
+        /* 基础样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
+        }
+        
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            overflow-x: hidden;
+            -webkit-text-size-adjust: 100%; /* 防止字体放大 */
+            -webkit-font-smoothing: antialiased; /* 字体平滑 */
+        }
+        
+        /* 移动端适配：顶部控制栏 */
+        .top-controls {
+            background-color: white;
+            padding: 12px 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            width: 100%;
+        }
+        
+        .title {
+            font-size: 1.2rem; /* 移动端字体稍小 */
+            color: #2c3e50;
+            font-weight: bold;
+            word-break: break-word; /* 长文本换行 */
+        }
+        
+        /* 移动端适配：按钮样式 */
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            touch-action: manipulation; /* 改善触摸响应 */
+            min-height: 44px; /* 移动端最小点击区域 */
+        }
+        
+        .btn:hover, .btn:active {
+            background-color: #2980b9;
+        }
+        
+        /* 主容器 - 移动端适配 */
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+        
+        /* 图片查看器 - 移动端优化 */
+        .image-viewer {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background-color: #2c3e50;
+            -webkit-overflow-scrolling: touch; /* 移动端平滑滚动 */
+            touch-action: pan-x pan-y; /* 允许拖拽 */
+        }
+        
+        /* 图片容器 - 移动端优化 */
+        .image-container {
+            position: relative;
+            display: inline-block;
+            min-width: 100%;
+            min-height: 100%;
+        }
+        
+        /* 图片本身 - 关键修改：取消移动端宽度限制，保持原始尺寸 */
+        #mainImage {
+            display: block;
+            /* 删除 max-width: 100%，让图片以原始尺寸显示 */
+            max-width: none;
+            height: auto;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        
+        /* 高亮区域 - 移动端优化 */
+        .highlight-area {
+            position: absolute;
+            border: 2px solid #e74c3c;
+            background-color: rgba(231, 76, 60, 0.3); /* 移动端增加透明度 */
+            pointer-events: auto;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 10;
+            touch-action: manipulation;
+        }
+        
+        .highlight-area:active {
+            background-color: rgba(52, 152, 219, 0.6); /* 点击反馈 */
+        }
+        
+        .area-label {
+            position: absolute;
+            background-color: #e74c3c;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .highlight-area:hover .area-label,
+        .highlight-area:active .area-label {
+            opacity: 1;
+        }
+        
+        /* 缩放控制 - 移动端优化 */
+        .zoom-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 800;
+        }
+        
+        .zoom-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: white;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+            min-height: 50px;
+            min-width: 50px;
+        }
+        
+        .zoom-btn:active {
+            transform: scale(0.95);
+            background-color: #f8f9fa;
+        }
+        
+        /* 加载状态 */
+        .loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 9999;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 移动设备检测提示 */
+        .mobile-tips {
+            position: fixed;
+            top: 60px;
+            left: 0;
+            width: 100%;
+            background-color: #f8f9fa;
+            padding: 10px;
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            border-bottom: 1px solid #ddd;
+            z-index: 999;
+            display: none;
+        }
+        
+        /* 移动端特有的样式 */
+        @media (max-width: 768px) {
+            .title {
+                font-size: 1rem;
+            }
+            
+            .btn {
+                padding: 8px 12px;
+                font-size: 13px;
+                min-height: 40px;
+            }
+            
+            .top-controls {
+                padding: 10px;
+            }
+            
+            .zoom-controls {
+                bottom: 10px;
+                right: 10px;
+            }
+            
+            .zoom-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 20px;
+            }
+            
+            .mobile-tips {
+                display: block;
+            }
+            
+            /* 关键修改：删除 #mainImage 的 max-width:100% 规则，让图片保持原始尺寸 */
+            /* 已在上方全局样式中设置 max-width: none，此处不再重复 */
+        }
+        
+        /* 超小屏幕设备 */
+        @media (max-width: 480px) {
+            .top-controls {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .title {
+                text-align: center;
+                width: 100%;
+            }
+            
+            .btn-group {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 8px;
+                width: 100%;
+            }
+            
+            .btn {
+                flex: 1;
+                min-width: 120px;
+                text-align: center;
+                justify-content: center;
+            }
+        }
+        
+        /* 防止图片过大导致内存问题 */
+        .image-container {
+            max-width: 100%;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <!-- 移动设备提示 -->
+    <div class="mobile-tips" id="mobileTips">
+        📱 提示：双指缩放图片，单指拖动查看
+    </div>
+    
+    <!-- 加载状态 -->
+    <div class="loader" id="loader">
+        <div class="spinner"></div>
+        <div id="loadingText">正在加载图片...</div>
+    </div>
+    
+    <div class="main-container">
+        <!-- 顶部控制栏 -->
+        <div class="top-controls">
+            <div class="title">图片导航系统</div>
+            <div class="btn-group" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="btn" onclick="toggleHighlights()">
+                    <span>🔍</span> 显示/隐藏区域
+                </button>
+                <button class="btn" onclick="showInfo()">
+                    <span>ℹ️</span> 信息
+                </button>
+                <button class="btn" onclick="resetView()">
+                    <span>🔄</span> 重置
+                </button>
+            </div>
+        </div>
+        
+        <!-- 图片查看器 -->
+        <div class="image-viewer" id="imageViewer">
+            <div class="image-container" id="imageContainer">
+                <!-- 图片将在这里加载 -->
+                <img src="zzk.png" alt="导航图片" id="mainImage">
+                <!-- 高亮区域将在这里动态创建 -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- 缩放控制 -->
+    <div class="zoom-controls">
+        <div class="zoom-btn" onclick="zoomIn()">+</div>
+        <div class="zoom-btn" onclick="zoomOut()">-</div>
+        <div class="zoom-btn" onclick="resetZoom()">↺</div>
+        <div class="zoom-btn" onclick="fitToScreen()">⤢</div>
+    </div>
+
+    <script>
+        // ============================
+        // 1. 移动端检测和初始化
+        // ============================
+        
+        // 检测是否为移动设备
+        function isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+        
+        // 检测是否为iOS设备
+        function isIOS() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        }
+        
+        // 检测是否为Android设备
+        function isAndroid() {
+            return /Android/.test(navigator.userAgent);
+        }
+        
+        // 原始图片尺寸
+        const ORIGINAL_WIDTH = 6345;
+        const ORIGINAL_HEIGHT = 12043;
+        
+        // 23个区域的原始坐标数据
+        const AREAS = [
+            { id: 1, name: "区域一", type: "poly", coords: [5, 813, 856, 572, 1097, 1412, 229, 1653], link: "menu1.html" },
+            { id: 2, name: "区域二", type: "poly", coords: [-6, 1709, 6311, -5, 6328, 684, 11, 2398], link: "menu2.html" },
+            { id: 3, name: "区域三", type: "poly", coords: [912, 2157, 1271, 3473, 4771, 2521, 4424, 1210], link: "menu3.html" },
+            { id: 4, name: "区域四", type: "poly", coords: [4664, 1250, 5807, 908, 5964, 1362, 4799, 1709], link: "menu4.html" },
+            { id: 5, name: "区域五", type: "circle", coords: [447, 2930, 289], link: "menu5.html" },
+            { id: 6, name: "区域六", type: "poly", coords: [44, 3916, 341, 3821, 369, 3933, 61, 4028], link: "menu6.html" },
+            { id: 7, name: "区域七", type: "rect", coords: [117, 4678, 4160, 5792], link: "menu7.html" },
+            { id: 8, name: "区域八", type: "rect", coords: [4267, 4678, 6221, 5781], link: "menu8.html" },
+            { id: 9, name: "区域九", type: "rect", coords: [123, 5910, 2072, 7008], link: "menu9.html" },
+            { id: 10, name: "区域十", type: "rect", coords: [2184, 5921, 4149, 7014], link: "menu10.html" },
+            { id: 11, name: "区域十一", type: "rect", coords: [4261, 5912, 6216, 7004], link: "menu11.html" },
+            { id: 12, name: "区域十二", type: "rect", coords: [100, 7111, 2066, 8220], link: "menu12.html" },
+            { id: 13, name: "区域十三", type: "rect", coords: [2189, 7128, 4149, 8214], link: "menu13.html" },
+            { id: 14, name: "区域十四", type: "rect", coords: [4289, 7150, 6221, 8197], link: "menu14.html" },
+            { id: 15, name: "区域十五", type: "rect", coords: [117, 8349, 2066, 9441], link: "menu15.html" },
+            { id: 16, name: "区域十六", type: "rect", coords: [2200, 8343, 4149, 9418], link: "menu16.html" },
+            { id: 17, name: "区域十七", type: "rect", coords: [4261, 8360, 6227, 9441], link: "menu17.html" },
+            { id: 18, name: "区域十八", type: "rect", coords: [106, 9564, 2077, 10673], link: "menu18.html" },
+            { id: 19, name: "区域十九", type: "rect", coords: [2156, 9553, 4144, 10662], link: "menu19.html" },
+            { id: 20, name: "区域二十", type: "rect", coords: [4261, 9519, 6227, 10712], link: "menu20.html" },
+            { id: 21, name: "区域二十一", type: "rect", coords: [111, 10785, 2055, 11877], link: "menu21.html" },
+            { id: 22, name: "区域二十二", type: "rect", coords: [2189, 10796, 4138, 11883], link: "menu22.html" },
+            { id: 23, name: "区域二十三", type: "rect", coords: [4278, 10796, 6216, 11883], link: "menu23.html" }
+        ];
+        
+        // 全局变量
+        let scaleFactor = 1;
+        // 修改：高亮区域默认不显示
+        let isHighlightsVisible = false;  // 默认隐藏
+        let currentZoom = 1;
+        let currentAreaId = null;
+        let isMobile = false;
+        let isTouchDevice = false;
+        
+        // ============================
+        // 2. 页面初始化
+        // ============================
+        
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('页面初始化...');
+            console.log('设备信息:', navigator.userAgent);
+            
+            // 检测设备类型
+            isMobile = isMobileDevice();
+            isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            
+            if (isMobile) {
+                console.log('检测到移动设备');
+                // 移动端优化
+                optimizeForMobile();
+            } else {
+                console.log('检测到桌面设备');
+            }
+            
+            // 加载图片
+            loadImage();
+        });
+        
+        // 移动端优化
+        function optimizeForMobile() {
+            // 隐藏移动端提示（3秒后自动隐藏）
+            const tips = document.getElementById('mobileTips');
+            setTimeout(() => {
+                tips.style.opacity = '0';
+                setTimeout(() => {
+                    tips.style.display = 'none';
+                }, 500);
+            }, 3000);
+            
+            // 移动端默认显示区域（这里不修改，因为默认隐藏）
+            // isHighlightsVisible = true;  // 删除这行，保持默认隐藏
+            
+            // 添加触摸事件支持
+            addTouchEvents();
+        }
+        
+        // ============================
+        // 3. 图片加载和区域创建
+        // ============================
+        
+        function loadImage() {
+            const img = document.getElementById('mainImage');
+            const loader = document.getElementById('loader');
+            const loadingText = document.getElementById('loadingText');
+            
+            // 移动端图片加载优化：使用压缩版图片（如果存在）
+            if (isMobile) {
+                // 尝试加载移动端专用图片（请将原图压缩后命名为 zzk_mobile.png）
+                img.src = 'zzk_mobile.png';
+                loadingText.textContent = '正在加载移动优化图片...';
+            } else {
+                img.src = 'zzk.png';
+                loadingText.textContent = '正在加载大尺寸图片...';
+            }
+            
+            // 图片加载成功
+            img.onload = function() {
+                console.log('图片加载成功!');
+                console.log('实际显示尺寸:', img.naturalWidth, 'x', img.naturalHeight);
+                
+                // 计算缩放因子
+                scaleFactor = 1;
+                
+                // 创建高亮区域
+                createHighlightAreas();
+                
+                // 如果默认隐藏，则立即隐藏所有高亮
+                if (!isHighlightsVisible) {
+                    document.querySelectorAll('.highlight-area').forEach(el => {
+                        el.style.display = 'none';
+                    });
+                }
+                
+                // 初始化图片位置
+                initializeImagePosition();
+                
+                // 隐藏加载动画
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    loadingText.textContent = '加载完成!';
+                }, 500);
+                
+                // 添加点击/触摸事件
+                addImageEvents();
+            };
+            
+            // 图片加载失败
+            img.onerror = function() {
+                console.error('图片加载失败:', img.src);
+                loadingText.textContent = '图片加载失败!';
+                loadingText.style.color = '#e74c3c';
+                
+                // 显示错误信息
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    if (isMobile) {
+                        alert('图片加载失败!\n请确保已准备移动版图片 "zzk_mobile.png"（建议压缩到2MB以内）');
+                    } else {
+                        alert('图片加载失败! 请检查:\n1. 图片文件名是否为 zzk.png\n2. 图片文件是否与HTML在同一目录');
+                    }
+                }, 1000);
+            };
+            
+            // 图片加载中（已在上面设置文本）
+        }
+        
+        // ============================
+        // 4. 事件处理
+        // ============================
+        
+        function addImageEvents() {
+            const img = document.getElementById('mainImage');
+            
+            // 移除旧事件
+            img.removeEventListener('click', handleImageClick);
+            img.removeEventListener('touchstart', handleTouchStart);
+            
+            // 添加新事件
+            if (isTouchDevice) {
+                // 触摸设备使用触摸事件
+                img.addEventListener('touchstart', handleTouchStart, { passive: true });
+                console.log('添加触摸事件');
+            } else {
+                // 非触摸设备使用点击事件
+                img.addEventListener('click', handleImageClick);
+                console.log('添加点击事件');
+            }
+        }
+        
+        // 添加触摸事件支持
+        function addTouchEvents() {
+            const viewer = document.getElementById('imageViewer');
+            
+            // 添加双指缩放手势
+            let initialDistance = 0;
+            
+            viewer.addEventListener('touchstart', function(e) {
+                if (e.touches.length === 2) {
+                    // 双指触摸
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    initialDistance = Math.sqrt(
+                        Math.pow(touch2.pageX - touch1.pageX, 2) + 
+                        Math.pow(touch2.pageY - touch1.pageY, 2)
+                    );
+                }
+            }, { passive: true });
+            
+            viewer.addEventListener('touchmove', function(e) {
+                if (e.touches.length === 2 && initialDistance > 0) {
+                    // 双指移动，计算缩放
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    const currentDistance = Math.sqrt(
+                        Math.pow(touch2.pageX - touch1.pageX, 2) + 
+                        Math.pow(touch2.pageY - touch1.pageY, 2)
+                    );
+                    
+                    const scaleChange = currentDistance / initialDistance;
+                    if (scaleChange > 1.1) {
+                        zoomIn();
+                        initialDistance = currentDistance;
+                    } else if (scaleChange < 0.9) {
+                        zoomOut();
+                        initialDistance = currentDistance;
+                    }
+                }
+            }, { passive: true });
+            
+            viewer.addEventListener('touchend', function() {
+                initialDistance = 0;
+            }, { passive: true });
+        }
+        
+        // 触摸开始事件
+        function handleTouchStart(e) {
+            // 阻止默认行为（如滚动）
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const img = e.target;
+            const rect = img.getBoundingClientRect();
+            const scrollLeft = document.getElementById('imageViewer').scrollLeft;
+            const scrollTop = document.getElementById('imageViewer').scrollTop;
+            
+            // 计算触摸位置相对于图片的绝对坐标
+            const touchX = touch.clientX - rect.left + scrollLeft;
+            const touchY = touch.clientY - rect.top + scrollTop;
+            
+            console.log('触摸位置:', touchX, touchY);
+            
+            // 检查触摸了哪个区域
+            for (const area of AREAS) {
+                if (isPointInArea(touchX, touchY, area)) {
+                    selectArea(area.id);
+                    navigateToArea(area.id);
+                    return;
+                }
+            }
+            
+            console.log('未触摸到任何区域');
+        }
+        
+        // 点击事件处理
+        function handleImageClick(event) {
+            const img = event.target;
+            const rect = img.getBoundingClientRect();
+            const scrollLeft = document.getElementById('imageViewer').scrollLeft;
+            const scrollTop = document.getElementById('imageViewer').scrollTop;
+            
+            // 计算点击位置相对于图片的绝对坐标
+            const clickX = event.clientX - rect.left + scrollLeft;
+            const clickY = event.clientY - rect.top + scrollTop;
+            
+            console.log('点击位置:', clickX, clickY);
+            
+            // 检查点击了哪个区域
+            for (const area of AREAS) {
+                if (isPointInArea(clickX, clickY, area)) {
+                    selectArea(area.id);
+                    navigateToArea(area.id);
+                    return;
+                }
+            }
+            
+            console.log('未点击到任何区域');
+        }
+        
+        // ============================
+        // 5. 高亮区域创建
+        // ============================
+        
+        function createHighlightAreas() {
+            const container = document.getElementById('imageContainer');
+            
+            // 移除旧的高亮区域
+            document.querySelectorAll('.highlight-area').forEach(el => el.remove());
+            
+            // 移动端区域优化
+            const areaOpacity = isMobile ? 0.25 : 0.2;
+            const borderWidth = isMobile ? 3 : 2;
+            
+            // 为每个区域创建高亮
+            AREAS.forEach(area => {
+                const highlight = createAreaHighlight(area, areaOpacity, borderWidth);
+                if (highlight) {
+                    container.appendChild(highlight);
+                }
+            });
+            
+            console.log('高亮区域创建完成，共', AREAS.length, '个区域');
+        }
+        
+        function createAreaHighlight(area, opacity, borderWidth) {
+            const highlight = document.createElement('div');
+            highlight.className = 'highlight-area';
+            highlight.dataset.areaId = area.id;
+            highlight.title = `${area.name} - 点击跳转`;
+            
+            // 设置区域样式
+            setAreaStyle(highlight, area, opacity, borderWidth);
+            
+            // 创建区域标签
+            const label = document.createElement('div');
+            label.className = 'area-label';
+            label.textContent = area.name;
+            highlight.appendChild(label);
+            
+            // 添加点击/触摸事件
+            if (isTouchDevice) {
+                highlight.addEventListener('touchstart', function(e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    selectArea(area.id);
+                    navigateToArea(area.id);
+                }, { passive: false });
+            } else {
+                highlight.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    selectArea(area.id);
+                    navigateToArea(area.id);
+                });
+            }
+            
+            return highlight;
+        }
+        
+        function setAreaStyle(element, area, opacity, borderWidth) {
+            // 移动端调整区域大小（这里保持原始坐标，不缩放）
+            // 注意：由于图片不再缩放，所以坐标不需要调整
+            
+            if (area.type === 'rect') {
+                const [x1, y1, x2, y2] = area.coords;
+                const width = Math.abs(x2 - x1);
+                const height = Math.abs(y2 - y1);
+                
+                element.style.left = Math.min(x1, x2) + 'px';
+                element.style.top = Math.min(y1, y2) + 'px';
+                element.style.width = width + 'px';
+                element.style.height = height + 'px';
+                element.style.borderRadius = '0';
+                
+            } else if (area.type === 'circle') {
+                const [cx, cy, r] = area.coords;
+                // 移动端不放大区域，保持原始半径
+                const radius = r;
+                
+                element.style.left = (cx - radius) + 'px';
+                element.style.top = (cy - radius) + 'px';
+                element.style.width = (radius * 2) + 'px';
+                element.style.height = (radius * 2) + 'px';
+                element.style.borderRadius = '50%';
+                
+            } else if (area.type === 'poly') {
+                // 多边形区域
+                const xs = [];
+                const ys = [];
+                for (let i = 0; i < area.coords.length; i += 2) {
+                    xs.push(area.coords[i]);
+                    ys.push(area.coords[i + 1]);
+                }
+                
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                
+                element.style.left = minX + 'px';
+                element.style.top = minY + 'px';
+                element.style.width = (maxX - minX) + 'px';
+                element.style.height = (maxY - minY) + 'px';
+                element.style.borderRadius = '0';
+                
+                // 创建多边形裁剪路径
+                const clipPoints = [];
+                for (let i = 0; i < area.coords.length; i += 2) {
+                    const x = area.coords[i] - minX;
+                    const y = area.coords[i + 1] - minY;
+                    clipPoints.push(`${x}px ${y}px`);
+                }
+                
+                element.style.clipPath = `polygon(${clipPoints.join(', ')})`;
+            }
+            
+            // 设置透明度和边框
+            element.style.backgroundColor = `rgba(231, 76, 60, ${opacity})`;
+            element.style.borderWidth = borderWidth + 'px';
+        }
+        
+        // ============================
+        // 6. 工具函数
+        // ============================
+        
+        function toggleHighlights() {
+            isHighlightsVisible = !isHighlightsVisible;
+            const highlights = document.querySelectorAll('.highlight-area');
+            
+            if (isHighlightsVisible) {
+                highlights.forEach(h => h.style.display = 'block');
+                if (!isMobile) alert('区域高亮已显示');
+            } else {
+                highlights.forEach(h => h.style.display = 'none');
+                if (!isMobile) alert('区域高亮已隐藏');
+            }
+        }
+        
+        function selectArea(areaId) {
+            if (currentAreaId !== null) {
+                const prevHighlight = document.querySelector(`.highlight-area[data-area-id="${currentAreaId}"]`);
+                if (prevHighlight) {
+                    prevHighlight.style.backgroundColor = 'rgba(231, 76, 60, 0.3)';
+                    prevHighlight.style.borderColor = '#e74c3c';
+                }
+            }
+            
+            const highlight = document.querySelector(`.highlight-area[data-area-id="${areaId}"]`);
+            
+            if (highlight) {
+                highlight.style.backgroundColor = 'rgba(52, 152, 219, 0.6)';
+                highlight.style.borderColor = '#3498db';
+                highlight.style.zIndex = '100';
+                
+                // 滚动到区域位置
+                const viewer = document.getElementById('imageViewer');
+                const rect = highlight.getBoundingClientRect();
+                const viewerRect = viewer.getBoundingClientRect();
+                
+                viewer.scrollTo({
+                    left: viewer.scrollLeft + rect.left - viewerRect.width / 2 + rect.width / 2,
+                    top: viewer.scrollTop + rect.top - viewerRect.height / 2 + rect.height / 2,
+                    behavior: 'smooth'
+                });
+            }
+            
+            currentAreaId = areaId;
+        }
+        
+        function navigateToArea(areaId) {
+            const area = AREAS.find(a => a.id === areaId);
+            if (!area) return;
+            
+            console.log(`准备跳转到: ${area.link}`);
+            
+            // 移动端使用更友好的提示
+            if (isMobile) {
+                const userChoice = confirm(`跳转到 ${area.name}？\n\n链接: ${area.link}\n\n确定跳转？`);
+                if (userChoice) {
+                    // 实际使用时取消注释
+                    // window.location.href = area.link;
+                    alert(`即将跳转到 ${area.link}`);
+                }
+            } else {
+                const confirmJump = confirm(`确定要跳转到"${area.name}"的下级菜单吗？\n\n链接: ${area.link}`);
+                if (confirmJump) {
+                    // 实际使用时取消注释
+                    // window.location.href = area.link;
+                    alert(`即将跳转到 ${area.link}`);
+                }
+            }
+        }
+        
+        function showInfo() {
+            const info = `图片导航系统
+            原始尺寸: 6345 × 12043 像素
+            区域总数: 23个
+            
+            操作说明:
+            ${isMobile ? '1. 双指缩放图片\n2. 单指拖动查看\n3. 点击区域跳转' : '1. 鼠标滚轮缩放\n2. 拖拽图片查看\n3. 点击区域跳转'}
+            
+            提示: ${isMobile ? '建议使用压缩版图片（zzk_mobile.png）以提升加载速度' : '图片较大，请耐心加载'}`;
+            
+            alert(info);
+        }
+        
+        function resetView() {
+            const viewer = document.getElementById('imageViewer');
+            viewer.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+            
+            currentZoom = 1;
+            const img = document.getElementById('mainImage');
+            img.style.transform = 'scale(1)';
+            img.style.transformOrigin = '0 0';
+            
+            currentAreaId = null;
+            document.querySelectorAll('.highlight-area').forEach(h => {
+                h.style.backgroundColor = 'rgba(231, 76, 60, 0.3)';
+                h.style.borderColor = '#e74c3c';
+                h.style.zIndex = '10';
+            });
+            
+            if (!isMobile) alert('视图已重置');
+        }
+        
+        // ============================
+        // 7. 缩放功能
+        // ============================
+        
+        function zoomIn() {
+            currentZoom *= isMobile ? 1.3 : 1.2;
+            applyZoom();
+        }
+        
+        function zoomOut() {
+            currentZoom /= isMobile ? 1.3 : 1.2;
+            if (currentZoom < 0.1) currentZoom = 0.1;
+            applyZoom();
+        }
+        
+        function resetZoom() {
+            currentZoom = 1;
+            applyZoom();
+        }
+        
+        function fitToScreen() {
+            const viewer = document.getElementById('imageViewer');
+            const img = document.getElementById('mainImage');
+            
+            if (img.naturalWidth === 0) return; // 图片未加载
+            
+            const viewerWidth = viewer.clientWidth;
+            const viewerHeight = viewer.clientHeight;
+            const imgWidth = img.naturalWidth;
+            const imgHeight = img.naturalHeight;
+            
+            const scaleX = viewerWidth / imgWidth;
+            const scaleY = viewerHeight / imgHeight;
+            currentZoom = Math.min(scaleX, scaleY) * 0.9; // 稍微缩小一点
+            
+            applyZoom();
+            
+            // 滚动到顶部
+            viewer.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+        }
+        
+        function applyZoom() {
+            const img = document.getElementById('mainImage');
+            img.style.transform = `scale(${currentZoom})`;
+            img.style.transformOrigin = '0 0';
+            
+            console.log('当前缩放级别:', currentZoom);
+        }
+        
+        function initializeImagePosition() {
+            const viewer = document.getElementById('imageViewer');
+            viewer.scrollTo({ top: 0, left: 0 });
+            
+            // 关键修改：移动端不再自动适应屏幕，保持原始尺寸
+            // 注释掉以下代码，避免移动端自动缩放图片
+            // if (isMobile) {
+            //     setTimeout(fitToScreen, 100);
+            // }
+        }
+        
+        // ============================
+        // 8. 辅助函数
+        // ============================
+        
+        function isPointInArea(x, y, area) {
+            if (area.type === 'rect') {
+                const [x1, y1, x2, y2] = area.coords;
+                const left = Math.min(x1, x2);
+                const right = Math.max(x1, x2);
+                const top = Math.min(y1, y2);
+                const bottom = Math.max(y1, y2);
+                
+                return x >= left && x <= right && y >= top && y <= bottom;
+                
+            } else if (area.type === 'circle') {
+                const [cx, cy, r] = area.coords;
+                const distance = Math.sqrt(Math.pow(x - cx, 2) + Math.pow(y - cy, 2));
+                return distance <= r;
+                
+            } else if (area.type === 'poly') {
+                return isPointInPolygon(x, y, area.coords);
+            }
+            
+            return false;
+        }
+        
+        function isPointInPolygon(x, y, coords) {
+            let inside = false;
+            const numPoints = coords.length / 2;
+            
+            for (let i = 0, j = numPoints - 1; i < numPoints; j = i++) {
+                const xi = coords[i * 2];
+                const yi = coords[i * 2 + 1];
+                const xj = coords[j * 2];
+                const yj = coords[j * 2 + 1];
+                
+                const intersect = ((yi > y) !== (yj > y)) &&
+                    (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                
+                if (intersect) inside = !inside;
+            }
+            
+            return inside;
+        }
+        
+        // ============================
+        // 9. 移动端优化建议
+        // ============================
+        
+        console.log('移动端适配版已加载');
+    </script>
+</body>
+</html>
